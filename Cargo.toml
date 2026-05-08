@@ -1,0 +1,28 @@
+[package]
+name = "motorcom"
+version = "2.0.0-alpha.1"
+edition = "2021"
+license = "Apache-2.0"
+authors = ["Tony Wang"]
+description = "Rust library for CAN-bus actuator motors (Damiao, Robstride, ...)."
+homepage = "https://createra.tech"
+repository = "https://github.com/createra-robotics/rust_motorcom"
+readme = "README.md"
+keywords = ["robotics", "damiao", "robstride", "can", "canfd"]
+categories = ["science::robotics", "embedded"]
+
+[lib]
+crate-type = ["lib", "cdylib"]
+
+[features]
+default           = ["socketcan-backend"]
+socketcan-backend = ["dep:socketcan"]
+
+[dependencies]
+log          = "0.4.17"
+thiserror    = "2.0"
+embedded-can = "0.4"
+num_enum     = "0.7.3"
+
+# Optional CAN backends
+socketcan = { version = "3.5", optional = true }

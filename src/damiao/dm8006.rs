@@ -1,0 +1,10 @@
+use crate::damiao::mit::MitLimits;
+
+/// DM8006: position ±12.5 rad, velocity ±45 rad/s, torque ±40 N·m.
+pub const DM8006: MitLimits = MitLimits {
+    p_max: 12.5,
+    v_max: 45.0,
+    kp_max: 500.0,
+    kd_max: 5.0,
+    t_max: 40.0,
+};
