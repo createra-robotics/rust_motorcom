@@ -18,6 +18,15 @@ crate-type = ["lib", "cdylib"]
 default           = ["socketcan-backend", "serial-backend"]
 socketcan-backend = ["dep:socketcan"]
 serial-backend    = ["dep:serialport"]
+# Builds the cdylib as a Python extension module (pyo3) and enables the
+# `stub_gen` binary that emits .pyi type stubs. CI builds wheels with this on.
+python            = ["dep:pyo3", "dep:pyo3-stub-gen", "dep:pyo3-log"]
+
+# Stub generator — only buildable with the `python` feature, since it uses
+# pyo3 / pyo3-stub-gen. Run as: cargo run --bin stub_gen --features python
+[[bin]]
+name = "stub_gen"
+required-features = ["python"]
 
 [dependencies]
 thiserror    = "2.0"
@@ -27,3 +36,7 @@ embedded-can = "0.4"
 socketcan = { version = "3.5", optional = true }
 # Optional serial backend (Unitree GO-M8010-6 RS485)
 serialport = { version = "4.3", optional = true }
+# Optional Python bindings
+pyo3          = { version = "0.22", optional = true }
+pyo3-log      = { version = "0.11", optional = true }
+pyo3-stub-gen = { version = "0.6",  optional = true }

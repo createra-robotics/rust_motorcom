@@ -35,3 +35,9 @@
 pub mod transport;
 pub mod damiao;
 pub mod robstride;
+
+// Python bindings — built only when the `python` feature is enabled. Exposes
+// a `motorcom` Python module via pyo3 and provides `stub_info()` for the
+// `stub_gen` binary to emit .pyi files.
+#[cfg(feature = "python")]
+pub mod python;
