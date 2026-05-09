@@ -1,6 +1,6 @@
 [package]
 name = "motorcom"
-version = "1.0.0"
+version = "1.0.1"
 edition = "2021"
 license = "Apache-2.0"
 authors = ["Tony Wang"]
@@ -34,8 +34,13 @@ embedded-can = "0.4"
 
 # Optional CAN backends
 socketcan = { version = "3.5", optional = true }
-# Optional serial backend (Unitree GO-M8010-6 RS485)
-serialport = { version = "4.3", optional = true }
+# Optional serial backend (Unitree GO-M8010-6 RS485).
+# `default-features = false` is critical: serialport's default feature set
+# pulls in `libudev` (→ libudev-sys), which forces downstream crates and CI
+# images without libudev-dev installed to fail at link time even when they
+# never enable `serial-backend`. Re-enable specific serialport features here
+# if/when the unitree RS485 transport actually needs them.
+serialport = { version = "4.3", default-features = false, optional = true }
 # Optional Python bindings
 pyo3          = { version = "0.22", features = ["multiple-pymethods"], optional = true }
 pyo3-log      = { version = "0.11", optional = true }
