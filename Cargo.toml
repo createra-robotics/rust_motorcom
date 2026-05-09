@@ -4,19 +4,20 @@ version = "2.0.0-alpha.1"
 edition = "2021"
 license = "Apache-2.0"
 authors = ["Tony Wang"]
-description = "Rust library for CAN-bus actuator motors (Damiao, Robstride, ...)."
+description = "Rust library for actuator motors (Damiao, Robstride, Unitree, ...)."
 homepage = "https://createra.tech"
 repository = "https://github.com/createra-robotics/rust_motorcom"
 readme = "README.md"
-keywords = ["robotics", "damiao", "robstride", "can", "canfd"]
+keywords = ["robotics", "damiao", "robstride", "unitree", "can"]
 categories = ["science::robotics", "embedded"]
 
 [lib]
 crate-type = ["lib", "cdylib"]
 
 [features]
-default           = ["socketcan-backend"]
+default           = ["socketcan-backend", "serial-backend"]
 socketcan-backend = ["dep:socketcan"]
+serial-backend    = ["dep:serialport"]
 
 [dependencies]
 log          = "0.4.17"
@@ -26,3 +27,5 @@ num_enum     = "0.7.3"
 
 # Optional CAN backends
 socketcan = { version = "3.5", optional = true }
+# Optional serial backend (Unitree GO-M8010-6 RS485)
+serialport = { version = "4.3", optional = true }

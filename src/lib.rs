@@ -1,4 +1,4 @@
-//! Rust library for CAN-bus actuator motors (Damiao, Robstride, ...).
+//! Rust library for actuator motors (Damiao, Robstride, Unitree, ...).
 //!
 //! ## Layers
 //!
@@ -7,6 +7,9 @@
 //!   Candlelight (`gs_usb`) USB adapters and for the MCP2518FD on
 //!   Raspberry Pi (`mcp251xfd`), as well as `vcan` for tests.
 //! * [`damiao`] — Damiao MIT-mode protocol (classic CAN, 1 Mbit).
+//! * [`robstride`] — Robstride RS-series protocol (classic CAN, extended ids).
+//! * [`unitree`] — Unitree GO-M8010-6 protocol (RS485 at 4 Mbps via a USB-UART
+//!   bridge — *not* CAN). Owns its own serial transport.
 //!
 //! ## Example
 //!
