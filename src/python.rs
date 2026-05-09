@@ -25,13 +25,15 @@ use pyo3_stub_gen::derive::{gen_stub_pyclass, gen_stub_pyfunction, gen_stub_pyme
 
 use crate::damiao::mit::{MitLimits, MitSetpoint, MotorState};
 use crate::damiao::{
-    self, ControlMode, Damiao, DM10010, DM10010L, DM3507, DM4310, DM4310P, DM4340, DM4340P,
+    self, Damiao, DM10010, DM10010L, DM3507, DM4310, DM4310P, DM4340, DM4340P,
     DM6006, DM6248P, DM8006, DM8009, DMG6215, DMH3510, DMH6220, DMJH11,
 };
-use crate::transport::{CanError, CanTransport};
+use crate::transport::CanError;
 
 #[cfg(feature = "socketcan-backend")]
-use crate::transport::SocketCanTransport;
+use crate::damiao::ControlMode;
+#[cfg(feature = "socketcan-backend")]
+use crate::transport::{CanTransport, SocketCanTransport};
 
 // ---------------------------------------------------------------------------
 // Error mapping
@@ -200,6 +202,9 @@ pub struct PyDamiao {
     inner: Damiao,
 }
 
+// Always-on PyDamiao methods: constructors, getters, repr. Available even
+// when no transport backend is compiled in (e.g. wheel-only data classes
+// on Windows / macOS).
 #[gen_stub_pymethods]
 #[pymethods]
 impl PyDamiao {
@@ -219,11 +224,27 @@ impl PyDamiao {
     #[getter] fn motor_id(&self)   -> u16 { self.inner.motor_id  }
     #[getter] fn master_id(&self)  -> u16 { self.inner.master_id }
 
-    // CAN ops use a short per-command timeout (~20 ms default), so we keep
-    // the GIL across the call rather than mediating Send-ness for the
-    // SocketCanTransport handle. `bus.borrow()` returns a `PyRef` that
-    // must out-live the lock guard, so each call binds it explicitly.
-    #[cfg(feature = "socketcan-backend")]
+    fn __repr__(&self) -> String {
+        format!(
+            "Damiao(motor_id={:#x}, master_id={:#x})",
+            self.inner.motor_id, self.inner.master_id
+        )
+    }
+}
+
+// CAN ops gated on the SocketCAN backend. Putting them in a separate
+// `impl` block (rather than `#[cfg]`-gating individual methods) keeps
+// `gen_stub_pymethods` from emitting metadata that references
+// `PySocketCanTransport` when the type doesn't exist.
+//
+// CAN ops use a short per-command timeout (~20 ms default), so we keep
+// the GIL across the call rather than mediating Send-ness for the
+// SocketCanTransport handle. `bus.borrow()` returns a `PyRef` that
+// must out-live the lock guard, so each call binds it explicitly.
+#[cfg(feature = "socketcan-backend")]
+#[gen_stub_pymethods]
+#[pymethods]
+impl PyDamiao {
     fn enable(&self, bus: &Bound<'_, PySocketCanTransport>) -> PyResult<PyMotorState> {
         let bus_ref = bus.borrow();
         let mut guard = bus_ref.inner.lock().unwrap();
@@ -233,7 +254,6 @@ impl PyDamiao {
             .map_err(dm_err_to_py)
     }
 
-    #[cfg(feature = "socketcan-backend")]
     fn disable(&self, bus: &Bound<'_, PySocketCanTransport>) -> PyResult<PyMotorState> {
         let bus_ref = bus.borrow();
         let mut guard = bus_ref.inner.lock().unwrap();
@@ -243,7 +263,6 @@ impl PyDamiao {
             .map_err(dm_err_to_py)
     }
 
-    #[cfg(feature = "socketcan-backend")]
     fn set_zero(&self, bus: &Bound<'_, PySocketCanTransport>) -> PyResult<PyMotorState> {
         let bus_ref = bus.borrow();
         let mut guard = bus_ref.inner.lock().unwrap();
@@ -253,7 +272,6 @@ impl PyDamiao {
             .map_err(dm_err_to_py)
     }
 
-    #[cfg(feature = "socketcan-backend")]
     fn clear_error(&self, bus: &Bound<'_, PySocketCanTransport>) -> PyResult<PyMotorState> {
         let bus_ref = bus.borrow();
         let mut guard = bus_ref.inner.lock().unwrap();
@@ -263,7 +281,6 @@ impl PyDamiao {
             .map_err(dm_err_to_py)
     }
 
-    #[cfg(feature = "socketcan-backend")]
     fn mit_control(
         &self,
         bus: &Bound<'_, PySocketCanTransport>,
@@ -280,20 +297,12 @@ impl PyDamiao {
     /// Force the firmware into MIT control mode (register 10 = 1). Some
     /// motors ship in POS_VEL/VEL/FORCE_POS, in which case `mit_control` is
     /// silently ignored.
-    #[cfg(feature = "socketcan-backend")]
     fn ensure_mit_mode(&self, bus: &Bound<'_, PySocketCanTransport>) -> PyResult<()> {
         let bus_ref = bus.borrow();
         let mut guard = bus_ref.inner.lock().unwrap();
         self.inner
             .ensure_control_mode(&mut *guard as &mut dyn CanTransport, ControlMode::Mit)
             .map_err(dm_err_to_py)
-    }
-
-    fn __repr__(&self) -> String {
-        format!(
-            "Damiao(motor_id={:#x}, master_id={:#x})",
-            self.inner.motor_id, self.inner.master_id
-        )
     }
 }
 

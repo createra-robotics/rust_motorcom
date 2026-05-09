@@ -38,33 +38,20 @@ jobs:
             3.11
             3.12
             3.13
-      # `serialport` (default feature) pulls libudev-sys, which needs the
-      # system libudev headers. Without this the stub_gen step below dies
-      # with "Package libudev was not found in the pkg-config search path".
-      - name: Install libudev-dev (host)
-        run: sudo apt-get update && sudo apt-get install -y libudev-dev pkg-config
+      # The Python bindings only expose Damiao + SocketCanTransport, so we
+      # drop the `serial-backend` default feature here. That avoids the
+      # libudev/pkg-config cross-compile rabbit hole on aarch64/armv7
+      # (manylinux2014-cross containers don't ship target-arch libudev).
       - name: Generate pyo3 stub
         run: |
-          cargo run --bin stub_gen --features python
+          cargo run --bin stub_gen --no-default-features --features python,socketcan-backend
       - name: Build wheels
         uses: PyO3/maturin-action@v1
         with:
           target: ${{ matrix.platform.target }}
-          args: --release --features python --features pyo3/extension-module --out dist --interpreter 3.10 3.11 3.12 3.13
+          args: --release --no-default-features --features python,socketcan-backend --features pyo3/extension-module --out dist --interpreter 3.10 3.11 3.12 3.13
           sccache: ${{ !startsWith(github.ref, 'refs/tags/') }}
           manylinux: auto
-          # Same problem inside the manylinux container — install libudev
-          # against whichever package manager the chosen container ships.
-          before-script-linux: |
-            if command -v dnf >/dev/null 2>&1; then
-              dnf install -y systemd-devel pkgconfig
-            elif command -v yum >/dev/null 2>&1; then
-              yum install -y systemd-devel pkgconfig
-            elif command -v apt-get >/dev/null 2>&1; then
-              apt-get update && apt-get install -y libudev-dev pkg-config
-            elif command -v apk >/dev/null 2>&1; then
-              apk add --no-cache eudev-dev pkgconfig
-            fi
       - name: Upload wheels
         uses: actions/upload-artifact@v4
         with:
@@ -93,20 +80,16 @@ jobs:
             3.11
             3.12
             3.13
-      - name: Install libudev-dev (host)
-        run: sudo apt-get update && sudo apt-get install -y libudev-dev pkg-config
       - name: Generate pyo3 stub
         run: |
-          cargo run --bin stub_gen --features python
+          cargo run --bin stub_gen --no-default-features --features python,socketcan-backend
       - name: Build wheels
         uses: PyO3/maturin-action@v1
         with:
           target: ${{ matrix.platform.target }}
-          args: --release --features python --features pyo3/extension-module --out dist --interpreter 3.10 3.11 3.12 3.13
+          args: --release --no-default-features --features python,socketcan-backend --features pyo3/extension-module --out dist --interpreter 3.10 3.11 3.12 3.13
           sccache: ${{ !startsWith(github.ref, 'refs/tags/') }}
           manylinux: musllinux_1_2
-          before-script-linux: |
-            apk add --no-cache eudev-dev pkgconfig
       - name: Upload wheels
         uses: actions/upload-artifact@v4
         with:
@@ -128,11 +111,14 @@ jobs:
         with:
           python-version: 3.x
           architecture: ${{ matrix.platform.target }}
+      # Windows wheel: data classes only — `socketcan` is Linux-only and
+      # `serialport` needs system libudev on Linux. Drop both backends; the
+      # wheel still ships MitSetpoint / MotorState / MitLimits bindings.
       - name: Build wheels
         uses: PyO3/maturin-action@v1
         with:
           target: ${{ matrix.platform.target }}
-          args: --release --features python --features pyo3/extension-module --out dist --find-interpreter
+          args: --release --no-default-features --features python --features pyo3/extension-module --out dist --find-interpreter
           sccache: ${{ !startsWith(github.ref, 'refs/tags/') }}
       - name: Upload wheels
         uses: actions/upload-artifact@v4
@@ -158,14 +144,15 @@ jobs:
             3.11
             3.12
             3.13
+      # macOS wheel: data classes only (same reasoning as Windows).
       - name: Generate pyo3 stub
         run: |
-          cargo run --bin stub_gen --features python 
+          cargo run --bin stub_gen --no-default-features --features python
       - name: Build wheels
         uses: PyO3/maturin-action@v1
         with:
           target: ${{ matrix.platform.target }}
-          args: --release --features python --features pyo3/extension-module --out dist --find-interpreter
+          args: --release --no-default-features --features python --features pyo3/extension-module --out dist --find-interpreter
           sccache: ${{ !startsWith(github.ref, 'refs/tags/') }}
       - name: Upload wheels
         uses: actions/upload-artifact@v4
@@ -177,11 +164,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Install libudev-dev (host)
-        run: sudo apt-get update && sudo apt-get install -y libudev-dev pkg-config
       - name: Generate pyo3 stub
         run: |
-          cargo run --bin stub_gen --features python
+          cargo run --bin stub_gen --no-default-features --features python,socketcan-backend
       - name: Build sdist
         uses: PyO3/maturin-action@v1
         with:

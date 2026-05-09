@@ -37,7 +37,7 @@ socketcan = { version = "3.5", optional = true }
 # Optional serial backend (Unitree GO-M8010-6 RS485)
 serialport = { version = "4.3", optional = true }
 # Optional Python bindings
-pyo3          = { version = "0.22", optional = true }
+pyo3          = { version = "0.22", features = ["multiple-pymethods"], optional = true }
 pyo3-log      = { version = "0.11", optional = true }
 pyo3-stub-gen = { version = "0.6",  optional = true }
 
