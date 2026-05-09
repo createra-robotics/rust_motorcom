@@ -10,6 +10,17 @@ MotorCom is a communication library for Damiao/Robstride motors.
 * Support for MIT mode
 * Pure Rust plus python bindings (using [pyo3](https://pyo3.rs/)).
 
+---
+
+## Dependencies
+
+```bash
+sudo apt update
+sudo apt install -y libudev-dev
+```
+
+---
+
 ## APIs
 
 It exposes two layers:
