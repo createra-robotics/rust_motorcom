@@ -40,3 +40,11 @@ serialport = { version = "4.3", optional = true }
 pyo3          = { version = "0.22", optional = true }
 pyo3-log      = { version = "0.11", optional = true }
 pyo3-stub-gen = { version = "0.6",  optional = true }
+
+# Hint for rust-analyzer (VS Code, Helix, Neovim) so it analyzes the
+# python-feature-only `stub_gen` bin and `src/python.rs` without flagging
+# them as inactive. IntelliJ Rust / RustRover doesn't read this — set
+# Settings → Languages & Frameworks → Rust → Cargo → "Use all features",
+# or check the `python` feature in workspace.xml's <CargoProjects>.
+[package.metadata.rust-analyzer]
+cargo.features = "all"
