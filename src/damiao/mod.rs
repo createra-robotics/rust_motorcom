@@ -32,7 +32,7 @@ pub mod status;
 
 pub use driver::Damiao;
 pub use error::Error;
-pub use modes::ControlMode;
+pub use modes::{ControlMode, ControlSetpoint};
 pub use registers::{Access, BaudRate, DataType, RegisterInfo, RegisterValue, REGISTER_TABLE};
 pub use status::MotorStatus;
 

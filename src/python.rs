@@ -25,7 +25,7 @@ use pyo3_stub_gen::derive::{gen_stub_pyclass, gen_stub_pyfunction, gen_stub_pyme
 
 use crate::damiao::mit::{MitLimits, MitSetpoint, MotorState};
 use crate::damiao::{
-    self, Damiao, DM10010, DM10010L, DM3507, DM4310, DM4310P, DM4340, DM4340P,
+    self, ControlSetpoint, Damiao, DM10010, DM10010L, DM3507, DM4310, DM4310P, DM4340, DM4340P,
     DM6006, DM6248P, DM8006, DM8009, DMG6215, DMH3510, DMH6220, DMJH11,
 };
 use crate::transport::CanError;
@@ -133,6 +133,73 @@ impl PyMitSetpoint {
     fn __repr__(&self) -> String {
         let s = self.inner;
         format!("MitSetpoint(q={}, dq={}, kp={}, kd={}, tau={})", s.q, s.dq, s.kp, s.kd, s.tau)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ControlSetpoint — unified setpoint that selects MIT / POS_VEL / VEL / FORCE_POS.
+// ---------------------------------------------------------------------------
+
+#[gen_stub_pyclass]
+#[pyclass(name = "ControlSetpoint", module = "motorcom")]
+#[derive(Clone, Copy)]
+pub struct PyControlSetpoint {
+    pub(crate) inner: ControlSetpoint,
+}
+
+#[gen_stub_pymethods]
+#[pymethods]
+impl PyControlSetpoint {
+    /// MIT impedance setpoint (control mode 1).
+    #[staticmethod]
+    fn mit(setpoint: PyMitSetpoint) -> Self {
+        Self { inner: ControlSetpoint::Mit(setpoint.inner) }
+    }
+
+    /// POS_VEL setpoint (control mode 2).
+    #[staticmethod]
+    fn pos_vel(position: f32, velocity: f32) -> Self {
+        Self { inner: ControlSetpoint::PosVel { position, velocity } }
+    }
+
+    /// VEL setpoint (control mode 3).
+    #[staticmethod]
+    fn vel(velocity: f32) -> Self {
+        Self { inner: ControlSetpoint::Vel(velocity) }
+    }
+
+    /// FORCE_POS setpoint (control mode 4).
+    #[staticmethod]
+    fn force_pos(position: f32, velocity_limit: f32, torque_ratio: f32) -> Self {
+        Self {
+            inner: ControlSetpoint::ForcePos {
+                position,
+                velocity_limit,
+                torque_ratio,
+            },
+        }
+    }
+
+    /// Numeric control mode (matches the value written to register 10).
+    #[getter]
+    fn mode(&self) -> u8 {
+        self.inner.mode() as u8
+    }
+
+    fn __repr__(&self) -> String {
+        match self.inner {
+            ControlSetpoint::Mit(sp) => format!(
+                "ControlSetpoint.mit(q={}, dq={}, kp={}, kd={}, tau={})",
+                sp.q, sp.dq, sp.kp, sp.kd, sp.tau
+            ),
+            ControlSetpoint::PosVel { position, velocity } => {
+                format!("ControlSetpoint.pos_vel(position={position}, velocity={velocity})")
+            }
+            ControlSetpoint::Vel(v) => format!("ControlSetpoint.vel({v})"),
+            ControlSetpoint::ForcePos { position, velocity_limit, torque_ratio } => format!(
+                "ControlSetpoint.force_pos(position={position}, velocity_limit={velocity_limit}, torque_ratio={torque_ratio})"
+            ),
+        }
     }
 }
 
@@ -294,6 +361,22 @@ impl PyDamiao {
             .map_err(dm_err_to_py)
     }
 
+    /// Unified send: dispatches to MIT / POS_VEL / VEL / FORCE_POS based on
+    /// the `ControlSetpoint` variant. The motor must already be in the
+    /// matching control mode (use `ensure_mit_mode()` or write register 10).
+    fn control(
+        &self,
+        bus: &Bound<'_, PySocketCanTransport>,
+        setpoint: PyControlSetpoint,
+    ) -> PyResult<PyMotorState> {
+        let bus_ref = bus.borrow();
+        let mut guard = bus_ref.inner.lock().unwrap();
+        self.inner
+            .control(&mut *guard as &mut dyn CanTransport, &setpoint.inner)
+            .map(|s| PyMotorState { inner: s })
+            .map_err(dm_err_to_py)
+    }
+
     /// Force the firmware into MIT control mode (register 10 = 1). Some
     /// motors ship in POS_VEL/VEL/FORCE_POS, in which case `mit_control` is
     /// silently ignored.
@@ -333,6 +416,7 @@ fn motorcom(m: &Bound<'_, PyModule>) -> PyResult<()> {
 
     m.add_class::<PyMitLimits>()?;
     m.add_class::<PyMitSetpoint>()?;
+    m.add_class::<PyControlSetpoint>()?;
     m.add_class::<PyMotorState>()?;
     m.add_class::<PyDamiao>()?;
 

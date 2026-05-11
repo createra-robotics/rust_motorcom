@@ -14,7 +14,7 @@ use crate::damiao::mit::{self, MitLimits, MitSetpoint, MotorState};
 use crate::transport::{CanError, CanFrame, CanId, CanTransport};
 
 use super::error::Error;
-use super::modes::{self, ControlMode};
+use super::modes::{self, ControlMode, ControlSetpoint};
 use super::registers::{self, BaudRate, DataType, RegisterValue};
 
 const ENABLE_CMD:      [u8; 8] = [0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFC];
@@ -135,6 +135,38 @@ impl Damiao {
     ) -> Result<MotorState, Error> {
         let payload = modes::force_pos_payload(position, velocity_limit, torque_ratio);
         self.cmd_at_arbitration(can, ControlMode::ForcePos.arbitration_id(self.motor_id), payload)
+    }
+
+    /// Unified entry point that dispatches to [`mit_control`], [`send_pos_vel`],
+    /// [`send_vel`], or [`send_force_pos`] based on the [`ControlSetpoint`]
+    /// variant. Lets callers switch control modes at the call site without
+    /// branching on mode themselves.
+    ///
+    /// The motor must already be in the matching control mode (register 10);
+    /// pair with [`ensure_control_mode`] when switching modes at runtime.
+    ///
+    /// [`mit_control`]: Self::mit_control
+    /// [`send_pos_vel`]: Self::send_pos_vel
+    /// [`send_vel`]: Self::send_vel
+    /// [`send_force_pos`]: Self::send_force_pos
+    /// [`ensure_control_mode`]: Self::ensure_control_mode
+    pub fn control(
+        &self,
+        can: &mut dyn CanTransport,
+        setpoint: &ControlSetpoint,
+    ) -> Result<MotorState, Error> {
+        match setpoint {
+            ControlSetpoint::Mit(sp) => self.mit_control(can, sp),
+            ControlSetpoint::PosVel { position, velocity } => {
+                self.send_pos_vel(can, *position, *velocity)
+            }
+            ControlSetpoint::Vel(velocity) => self.send_vel(can, *velocity),
+            ControlSetpoint::ForcePos {
+                position,
+                velocity_limit,
+                torque_ratio,
+            } => self.send_force_pos(can, *position, *velocity_limit, *torque_ratio),
+        }
     }
 
     // -------------------------------------------------------------------
@@ -512,5 +544,49 @@ mod tests {
         let sent = motor.peek().unwrap();
         assert_eq!(sent.id, CanId::Standard(0x02));
         assert_eq!(sent.data, mit::encode(&dm.limits, &sp).to_vec());
+    }
+
+    #[test]
+    fn control_dispatches_by_setpoint_variant() {
+        // MIT → motor_id arbitration.
+        let (mut host, mut motor) = MockTransport::pair();
+        let dm = Damiao::new(0x04, 0x14);
+        motor.send(&empty_status_frame(0x14)).unwrap();
+        let sp_mit = MitSetpoint { q: 0.1, dq: 0.0, kp: 30.0, kd: 1.0, tau: 0.0 };
+        dm.control(&mut host, &ControlSetpoint::Mit(sp_mit)).unwrap();
+        assert_eq!(motor.peek().unwrap().id, CanId::Standard(0x04));
+
+        // POS_VEL → 0x100 + motor_id arbitration.
+        let (mut host, mut motor) = MockTransport::pair();
+        let dm = Damiao::new(0x04, 0x14);
+        motor.send(&empty_status_frame(0x14)).unwrap();
+        dm.control(
+            &mut host,
+            &ControlSetpoint::PosVel { position: 0.5, velocity: 1.0 },
+        )
+        .unwrap();
+        assert_eq!(motor.peek().unwrap().id, CanId::Standard(0x104));
+
+        // VEL → 0x200 + motor_id arbitration.
+        let (mut host, mut motor) = MockTransport::pair();
+        let dm = Damiao::new(0x04, 0x14);
+        motor.send(&empty_status_frame(0x14)).unwrap();
+        dm.control(&mut host, &ControlSetpoint::Vel(2.0)).unwrap();
+        assert_eq!(motor.peek().unwrap().id, CanId::Standard(0x204));
+
+        // FORCE_POS → 0x300 + motor_id arbitration.
+        let (mut host, mut motor) = MockTransport::pair();
+        let dm = Damiao::new(0x04, 0x14);
+        motor.send(&empty_status_frame(0x14)).unwrap();
+        dm.control(
+            &mut host,
+            &ControlSetpoint::ForcePos {
+                position: 0.0,
+                velocity_limit: 10.0,
+                torque_ratio: 0.5,
+            },
+        )
+        .unwrap();
+        assert_eq!(motor.peek().unwrap().id, CanId::Standard(0x304));
     }
 }

@@ -13,6 +13,8 @@
 //! Replies in every mode arrive on the configured master id with the
 //! standard MIT-format status frame (see [`crate::damiao::mit`]).
 
+use crate::damiao::mit::MitSetpoint;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
 pub enum ControlMode {
@@ -20,6 +22,35 @@ pub enum ControlMode {
     PosVel   = 2,
     Vel      = 3,
     ForcePos = 4,
+}
+
+/// Unified control setpoint — bundles the mode with its payload so callers
+/// can pick the control mode at the call site (via [`crate::damiao::Damiao::control`])
+/// instead of dispatching to mode-specific methods themselves.
+#[derive(Debug, Clone, Copy)]
+pub enum ControlSetpoint {
+    Mit(MitSetpoint),
+    PosVel {
+        position: f32,
+        velocity: f32,
+    },
+    Vel(f32),
+    ForcePos {
+        position: f32,
+        velocity_limit: f32,
+        torque_ratio: f32,
+    },
+}
+
+impl ControlSetpoint {
+    pub fn mode(&self) -> ControlMode {
+        match self {
+            Self::Mit(_) => ControlMode::Mit,
+            Self::PosVel { .. } => ControlMode::PosVel,
+            Self::Vel(_) => ControlMode::Vel,
+            Self::ForcePos { .. } => ControlMode::ForcePos,
+        }
+    }
 }
 
 impl ControlMode {
