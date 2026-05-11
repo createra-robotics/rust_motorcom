@@ -11,11 +11,9 @@
 use std::time::Duration;
 use thiserror::Error;
 
-#[cfg(feature = "socketcan-backend")]
 pub mod socketcan_backend;
 pub mod mock;
 
-#[cfg(feature = "socketcan-backend")]
 pub use socketcan_backend::SocketCanTransport;
 pub use mock::MockTransport;
 

@@ -1,6 +1,6 @@
 [package]
 name = "motorcom"
-version = "1.1.0"
+version = "1.1.1"
 edition = "2021"
 license = "Apache-2.0"
 authors = ["Tony Wang"]
@@ -15,12 +15,11 @@ categories = ["science::robotics", "embedded"]
 crate-type = ["lib", "cdylib"]
 
 [features]
-default           = ["socketcan-backend", "serial-backend"]
-socketcan-backend = ["dep:socketcan"]
-serial-backend    = ["dep:serialport"]
+default        = ["serial-backend"]
+serial-backend = ["dep:serialport"]
 # Builds the cdylib as a Python extension module (pyo3) and enables the
 # `stub_gen` binary that emits .pyi type stubs. CI builds wheels with this on.
-python            = ["dep:pyo3", "dep:pyo3-stub-gen", "dep:pyo3-log"]
+python         = ["dep:pyo3", "dep:pyo3-stub-gen", "dep:pyo3-log"]
 
 # Stub generator — only buildable with the `python` feature, since it uses
 # pyo3 / pyo3-stub-gen. Run as: cargo run --bin stub_gen --features python
@@ -32,8 +31,8 @@ required-features = ["python"]
 thiserror    = "2.0"
 embedded-can = "0.4"
 
-# Optional CAN backends
-socketcan = { version = "3.5", optional = true }
+# Linux SocketCAN backend. Required — the crate only supports Linux.
+socketcan = "3.5"
 # Optional serial backend (Unitree GO-M8010-6 RS485).
 # `default-features = false` is critical: serialport's default feature set
 # pulls in `libudev` (→ libudev-sys), which forces downstream crates and CI

@@ -28,12 +28,8 @@ use crate::damiao::{
     self, ControlSetpoint, Damiao, DM10010, DM10010L, DM3507, DM4310, DM4310P, DM4340, DM4340P,
     DM6006, DM6248P, DM8006, DM8009, DMG6215, DMH3510, DMH6220, DMJH11,
 };
-use crate::transport::CanError;
-
-#[cfg(feature = "socketcan-backend")]
 use crate::damiao::ControlMode;
-#[cfg(feature = "socketcan-backend")]
-use crate::transport::{CanTransport, SocketCanTransport};
+use crate::transport::{CanError, CanTransport, SocketCanTransport};
 
 // ---------------------------------------------------------------------------
 // Error mapping
@@ -239,14 +235,12 @@ impl PyMotorState {
 // Transport — wrapped behind a Mutex so Python's GIL-released calls are sound.
 // ---------------------------------------------------------------------------
 
-#[cfg(feature = "socketcan-backend")]
 #[gen_stub_pyclass]
 #[pyclass(name = "SocketCanTransport", module = "motorcom")]
 pub struct PySocketCanTransport {
     pub(crate) inner: Mutex<SocketCanTransport>,
 }
 
-#[cfg(feature = "socketcan-backend")]
 #[gen_stub_pymethods]
 #[pymethods]
 impl PySocketCanTransport {
@@ -269,9 +263,10 @@ pub struct PyDamiao {
     inner: Damiao,
 }
 
-// Always-on PyDamiao methods: constructors, getters, repr. Available even
-// when no transport backend is compiled in (e.g. wheel-only data classes
-// on Windows / macOS).
+// CAN ops use a short per-command timeout (~20 ms default), so we keep the
+// GIL across the call rather than mediating Send-ness for the
+// SocketCanTransport handle. `bus.borrow()` returns a `PyRef` that must
+// out-live the lock guard, so each call binds it explicitly.
 #[gen_stub_pymethods]
 #[pymethods]
 impl PyDamiao {
@@ -297,21 +292,7 @@ impl PyDamiao {
             self.inner.motor_id, self.inner.master_id
         )
     }
-}
 
-// CAN ops gated on the SocketCAN backend. Putting them in a separate
-// `impl` block (rather than `#[cfg]`-gating individual methods) keeps
-// `gen_stub_pymethods` from emitting metadata that references
-// `PySocketCanTransport` when the type doesn't exist.
-//
-// CAN ops use a short per-command timeout (~20 ms default), so we keep
-// the GIL across the call rather than mediating Send-ness for the
-// SocketCanTransport handle. `bus.borrow()` returns a `PyRef` that
-// must out-live the lock guard, so each call binds it explicitly.
-#[cfg(feature = "socketcan-backend")]
-#[gen_stub_pymethods]
-#[pymethods]
-impl PyDamiao {
     fn enable(&self, bus: &Bound<'_, PySocketCanTransport>) -> PyResult<PyMotorState> {
         let bus_ref = bus.borrow();
         let mut guard = bus_ref.inner.lock().unwrap();
@@ -419,8 +400,6 @@ fn motorcom(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyControlSetpoint>()?;
     m.add_class::<PyMotorState>()?;
     m.add_class::<PyDamiao>()?;
-
-    #[cfg(feature = "socketcan-backend")]
     m.add_class::<PySocketCanTransport>()?;
 
     m.add_function(wrap_pyfunction!(mit_setpoint, m)?)?;
